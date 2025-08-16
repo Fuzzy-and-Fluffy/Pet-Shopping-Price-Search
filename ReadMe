@@ -1,0 +1,165 @@
+# AI代码项目No.1
+
+# Pet Shopping Price Search
+
+用 Selenium 抓取宠物用品价格与店铺信息，并把结果写回 Excel。  
+当前版本支持：
+- **99petshops** 搜索结果页（自动统计产品变体数量）
+- **Catevolution** 单品页  
+输出会生成带时间戳的新 Excel 文件，保留原表结构。
+
+---
+
+## 运行环境
+
+- **Python 3.10+**（建议 3.11/3.12）
+- **Google Chrome** 浏览器（与 ChromeDriver 版本需匹配，见下文）
+- Windows / macOS / Linux 均可
+
+> 代码当前 **未** 使用 `webdriver-manager`；因此需要安装 **ChromeDriver** 并确保它在系统 `PATH` 中，或与脚本同目录。
+
+---
+
+## 快速开始
+
+### 1) 克隆仓库 / 下载代码
+```bash
+git clone https://github.com/Fuzzy-and-Fluffy/Pet-Shopping-Price-Search.git
+cd Pet-Shopping-Price-Search
+````
+
+### 2) 创建虚拟环境并安装依赖
+
+**Windows (PowerShell)：**
+
+```powershell
+py -3 -m venv .venv
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass   # 如遇脚本执行限制，临时放行
+.\.venv\Scripts\Activate
+pip install -r requirements.txt
+```
+
+**macOS / Linux：**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3) 安装 ChromeDriver
+
+* 在 `chrome://settings/help` 查看 Chrome 版本（例如 120.x）。
+* 到 [https://chromedriver.chromium.org/downloads](https://chromedriver.chromium.org/downloads) 下载**匹配版本**的 ChromeDriver。
+* 解压后：
+
+  * **Windows**：把 `chromedriver.exe` 放到已在 `PATH` 的目录（如 `C:\Windows\System32`），或与脚本同一目录。
+  * **macOS / Linux**：将 `chromedriver` 放到 `/usr/local/bin/` 或其他 `PATH` 中的目录，并给予可执行权限：
+    `chmod +x /usr/local/bin/chromedriver`
+
+### 4) 准备 Excel 输入
+
+参见下方 [Excel 输入模板](#excel-输入模板)。
+
+### 5) 运行脚本
+
+**Windows：**
+
+```powershell
+python ".\Pet Price Check - Final.py"
+```
+
+**macOS / Linux：**
+
+```bash
+python "Pet Price Check - Final.py"
+```
+
+运行后将生成：
+`Pet Shopping List_updated_YYYYMMDD_HHMMSS.xlsx`
+
+---
+
+## Excel 输入模板
+
+将数据抓取模板，即名为 **`Pet Shopping List.xlsx`** 的文件放在项目根目录，首行是表头，必须包含以下列（中文列名要严格一致）：
+
+| 列名                   | 说明                                                         |
+| -------------------- | ---------------------------------------------------------- |
+| **链接**               | 商品链接（支持 `99petshops.com.au` 搜索页、`catevolution.com.au` 商品页） |
+| **最低价**              | 由脚本写入                                                      |
+| **最低价商店**            | 由脚本写入                                                      |
+| **Product Variants** | 由脚本写入（99petshops 统计独特标题数；没找到则至少为 1）                        |
+
+从第 2 行起是数据。脚本会逐行读取 `链接` 列并填回其它三列。
+
+如需改变或新增比价产品，请自行搜索并添加内容和链接到新的excel行中，并且将H和I列中的比价公式复制到新的行。
+---
+
+## 运行逻辑
+
+* 初始化 Selenium（**headless** 无头模式）并访问每个链接。
+* 对 **99petshops** 搜索页：
+
+  * 抓取产品卡片，依据标题去重统计 **变体数量**；
+  * 尝试从高亮价格（`span.hilighted span`）或普通价格（`span.normal span`）解析价格；
+  * 通过紧邻的 `img` 读取商店名（`alt`）。
+* 对 **Catevolution** 商品页：
+
+  * 读取 `meta[property='og:price:amount']` 获得价格；
+  * 商店名固定为 “Catevolution”，变体数为 1。
+* 每行处理后随机 `2~5` 秒间隔，降低反爬风险。
+* 最终以 `Pet Shopping List_updated_YYYYMMDD_HHMMSS.xlsx` 新文件保存。
+
+---
+
+## 常见问题排查
+
+### 1) `ModuleNotFoundError: No module named 'selenium'`
+
+* 没在虚拟环境中安装依赖。请激活 `.venv` 后执行：
+  `pip install -r requirements.txt`
+
+### 2) `selenium.common.exceptions.WebDriverException: 'chromedriver' executable needs to be in PATH`
+
+* 未安装或未配置 ChromeDriver。
+
+  * 安装匹配版本的 ChromeDriver，并放入 `PATH`（或与脚本在同一目录）。
+
+### 3) PowerShell 激活虚拟环境报执行策略错误
+
+```
+.\.venv\Scripts\Activate : ... running scripts is disabled on this system
+```
+
+* 临时放行当前会话：
+
+  ```powershell
+  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+  .\.venv\Scripts\Activate
+  ```
+
+---
+
+## 开发者提示
+
+* 生成/更新依赖清单：
+
+  ```bash
+  pip freeze > requirements.txt
+  ```
+* 建议在仓库添加 `.gitignore`（忽略 `.venv/`、`__pycache__/`、`.vscode/` 等）。
+* 如希望**免安装 ChromeDriver**，可改用 `webdriver-manager`：
+
+  ```python
+  from selenium.webdriver.chrome.service import Service
+  from webdriver_manager.chrome import ChromeDriverManager
+  driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+  ```
+
+---
+
+## 许可证
+
+开源
+
